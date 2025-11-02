@@ -9,27 +9,12 @@ A debugger such as "pdb" may be helpful for debugging.
 Read about it online.
 """
 import os
-# accessible as a variable in index.html:
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
 from flask import Flask, request, render_template, g, redirect, Response, abort
-
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 app = Flask(__name__, template_folder=tmpl_dir)
 
-
-#
-# The following is a dummy URI that does not connect to a valid database. You will need to modify it to connect to your Part 2 database in order to use the data.
-#
-# XXX: The URI should be in the format of: 
-#
-#     postgresql://USER:PASSWORD@34.139.8.30/proj1part2
-#
-# For example, if you had username ab1234 and password 123123, then the following line would be:
-#
-#     DATABASEURI = "postgresql://ab1234:123123@34.139.8.30/proj1part2"
-#
-# Modify these with your own credentials you received from TA!
 DATABASE_USERNAME = "pme2111"
 DATABASE_PASSWRD = "932856"
 DATABASE_HOST = "34.139.8.30"
