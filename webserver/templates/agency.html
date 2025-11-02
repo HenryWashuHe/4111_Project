@@ -5,7 +5,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 900px;
+            max-width: 1000px;
             margin: 50px auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -21,20 +21,36 @@
         }
         .search-form {
             margin: 20px 0;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
         }
-        input[type="text"] {
+        .form-section {
+            margin: 15px 0;
+        }
+        .form-section label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="text"], select {
             padding: 10px;
-            width: 300px;
+            width: 100%;
+            max-width: 500px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 14px;
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 30px;
             background-color: #28a745;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
         }
         button:hover {
             background-color: #218838;
@@ -109,10 +125,42 @@
 
         <div class="search-form">
             <form method="GET" action="/agency/search">
-                <input type="text" name="agency_name" placeholder="Enter agency name (e.g., Police)" required>
+                <div class="form-section">
+                    <label for="agency_dropdown">Select Agency:</label>
+                    <select name="agency_id" id="agency_dropdown">
+                        <option value="">-- Select an agency --</option>
+                        {% for a in agencies %}
+                        <option value="{{ a.id }}" {% if selected_agency_id == a.id %}selected{% endif %}>
+                            {{ a.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-section">
+                    <label>OR</label>
+                </div>
+                
+                <div class="form-section">
+                    <label for="agency_text">Search by Name:</label>
+                    <input type="text" name="agency_name" id="agency_text" placeholder="Enter agency name (e.g., Police)">
+                    <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Tip: You can enter a partial name (e.g., "Police" will find "New York City Police Department")</p>
+                </div>
+                
+                <div class="form-section">
+                    <label for="complaint_type_filter">Filter by Complaint Type (optional):</label>
+                    <select name="complaint_type_id" id="complaint_type_filter">
+                        <option value="">-- All Types --</option>
+                        {% for ct in complaint_types %}
+                        <option value="{{ ct.id }}" {% if selected_complaint_type_id == ct.id %}selected{% endif %}>
+                            {{ ct.topic }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
                 <button type="submit">Search</button>
             </form>
-            <p style="color: #666; font-size: 0.9em;">Tip: You can enter a partial name (e.g., "Police" will find "New York City Police Department")</p>
         </div>
 
         {% if error %}
@@ -149,6 +197,26 @@
                         {{ performance_text }}
                     </p>
                 </div>
+
+                {% if complaint_breakdown %}
+                <h3>Top Complaint Types Handled</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 10px; background-color: #28a745; color: white; border-bottom: 2px solid #218838;">Complaint Type</th>
+                            <th style="text-align: left; padding: 10px; background-color: #28a745; color: white; border-bottom: 2px solid #218838;">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cb in complaint_breakdown %}
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 10px;">{{ cb.type }}</td>
+                            <td style="padding: 10px;">{{ cb.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
             </div>
         {% endif %}
     </div>

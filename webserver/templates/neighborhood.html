@@ -5,7 +5,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 900px;
+            max-width: 1000px;
             margin: 50px auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -21,20 +21,36 @@
         }
         .search-form {
             margin: 20px 0;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
         }
-        input[type="text"] {
+        .form-section {
+            margin: 15px 0;
+        }
+        .form-section label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="text"], select {
             padding: 10px;
-            width: 300px;
+            width: 100%;
+            max-width: 500px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 14px;
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 30px;
             background-color: #007bff;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
         }
         button:hover {
             background-color: #0056b3;
@@ -106,7 +122,39 @@
 
         <div class="search-form">
             <form method="GET" action="/neighborhood/search">
-                <input type="text" name="neighborhood_name" placeholder="Enter neighborhood name (e.g., NEW YORK)" required>
+                <div class="form-section">
+                    <label for="neighborhood_dropdown">Select Neighborhood:</label>
+                    <select name="neighborhood_id" id="neighborhood_dropdown">
+                        <option value="">-- Select a neighborhood --</option>
+                        {% for n in neighborhoods %}
+                        <option value="{{ n.id }}" {% if selected_neighborhood_id == n.id %}selected{% endif %}>
+                            {{ n.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-section">
+                    <label>OR</label>
+                </div>
+                
+                <div class="form-section">
+                    <label for="neighborhood_text">Search by Name:</label>
+                    <input type="text" name="neighborhood_name" id="neighborhood_text" placeholder="Enter neighborhood name (e.g., NEW YORK)">
+                </div>
+                
+                <div class="form-section">
+                    <label for="complaint_type_filter">Filter by Complaint Type (optional):</label>
+                    <select name="complaint_type_id" id="complaint_type_filter">
+                        <option value="">-- All Types --</option>
+                        {% for ct in complaint_types %}
+                        <option value="{{ ct.id }}" {% if selected_complaint_type_id == ct.id %}selected{% endif %}>
+                            {{ ct.topic }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
                 <button type="submit">Search</button>
             </form>
         </div>
@@ -130,7 +178,7 @@
                 </div>
 
                 <h3>Complaints by Type</h3>
-                {% if complaint_types %}
+                {% if complaint_type_breakdown %}
                     <table>
                         <thead>
                             <tr>
@@ -139,7 +187,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for ct in complaint_types %}
+                            {% for ct in complaint_type_breakdown %}
                             <tr>
                                 <td>{{ ct.type }}</td>
                                 <td>{{ ct.count }}</td>
@@ -148,7 +196,7 @@
                         </tbody>
                     </table>
                 {% else %}
-                    <p>No complaints found for this neighborhood.</p>
+                    <p>No complaints found for this neighborhood with the selected filters.</p>
                 {% endif %}
             </div>
         {% endif %}
