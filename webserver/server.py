@@ -9,11 +9,14 @@ A debugger such as "pdb" may be helpful for debugging.
 Read about it online.
 """
 import os
+# accessible as a variable in index.html:
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
 from flask import Flask, request, render_template, g, redirect, Response, abort
+
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 app = Flask(__name__, template_folder=tmpl_dir)
+
 
 DATABASE_USERNAME = "pme2111"
 DATABASE_PASSWRD = "932856"
@@ -185,9 +188,43 @@ def login():
 @app.route('/neighborhood')
 def neighborhood_view():
 	"""
-	Display form to search neighborhoods
+	Display form to search neighborhoods with dynamic dropdowns
 	"""
-	return render_template("neighborhood.html")
+	# Get all neighborhoods from database
+	neighborhoods = []
+	complaint_types = []
+	
+	try:
+		neighborhoods_query = """
+			SELECT neighborhood_id, name 
+			FROM neighborhood 
+			ORDER BY name
+		"""
+		cursor = g.conn.execute(text(neighborhoods_query))
+		for row in cursor:
+			neighborhoods.append({"id": row[0], "name": row[1]})
+		cursor.close()
+		
+		# Get all complaint types from database
+		complaint_types_query = """
+			SELECT complaint_type_id, complaint_topic 
+			FROM complaint_type 
+			ORDER BY complaint_topic
+		"""
+		cursor = g.conn.execute(text(complaint_types_query))
+		for row in cursor:
+			complaint_types.append({"id": row[0], "topic": row[1]})
+		cursor.close()
+	except Exception as e:
+		print(f"Error loading dropdowns: {e}")
+		import traceback
+		traceback.print_exc()
+	
+	print(f"Loaded {len(neighborhoods)} neighborhoods and {len(complaint_types)} complaint types")
+	
+	return render_template("neighborhood.html", 
+		neighborhoods=neighborhoods, 
+		complaint_types=complaint_types)
 
 
 @app.route('/neighborhood/search', methods=['GET'])
@@ -198,44 +235,102 @@ def neighborhood_search():
 	- Complaint counts by type
 	- Total complaints
 	"""
+	# Get neighborhoods and complaint types for dropdowns
+	neighborhoods = []
+	complaint_types_list = []
+	
+	try:
+		neighborhoods_query = """
+			SELECT neighborhood_id, name 
+			FROM neighborhood 
+			ORDER BY name
+		"""
+		cursor = g.conn.execute(text(neighborhoods_query))
+		for row in cursor:
+			neighborhoods.append({"id": row[0], "name": row[1]})
+		cursor.close()
+		
+		complaint_types_query = """
+			SELECT complaint_type_id, complaint_topic 
+			FROM complaint_type 
+			ORDER BY complaint_topic
+		"""
+		cursor = g.conn.execute(text(complaint_types_query))
+		for row in cursor:
+			complaint_types_list.append({"id": row[0], "topic": row[1]})
+		cursor.close()
+	except Exception as e:
+		print(f"Error loading dropdown data in search: {e}")
+		import traceback
+		traceback.print_exc()
+	
+	# Get search parameters
+	neighborhood_id = request.args.get('neighborhood_id', '').strip()
 	neighborhood_name = request.args.get('neighborhood_name', '').strip().upper()
+	filter_complaint_type = request.args.get('complaint_type_id', '').strip()
 	
-	if not neighborhood_name:
-		return render_template("neighborhood.html", error="Please enter a neighborhood name")
-	
-	# Get neighborhood_id
-	neighborhood_query = """
-		SELECT neighborhood_id, name 
-		FROM neighborhood 
-		WHERE UPPER(name) = :name
-	"""
-	cursor = g.conn.execute(text(neighborhood_query), {"name": neighborhood_name})
-	neighborhood_row = cursor.fetchone()
-	cursor.close()
+	# Determine which parameter to use (dropdown takes precedence)
+	if neighborhood_id:
+		# Using dropdown selection
+		neighborhood_query = """
+			SELECT neighborhood_id, name 
+			FROM neighborhood 
+			WHERE neighborhood_id = :id
+		"""
+		cursor = g.conn.execute(text(neighborhood_query), {"id": neighborhood_id})
+		neighborhood_row = cursor.fetchone()
+		cursor.close()
+	elif neighborhood_name:
+		# Using text search
+		neighborhood_query = """
+			SELECT neighborhood_id, name 
+			FROM neighborhood 
+			WHERE UPPER(name) = :name
+		"""
+		cursor = g.conn.execute(text(neighborhood_query), {"name": neighborhood_name})
+		neighborhood_row = cursor.fetchone()
+		cursor.close()
+	else:
+		return render_template("neighborhood.html", 
+			neighborhoods=neighborhoods,
+			complaint_types=complaint_types_list,
+			error="Please select or enter a neighborhood name")
 	
 	if not neighborhood_row:
-		return render_template("neighborhood.html", error=f"Neighborhood '{neighborhood_name}' not found")
+		return render_template("neighborhood.html", 
+			neighborhoods=neighborhoods,
+			complaint_types=complaint_types_list,
+			error=f"Neighborhood not found")
 	
 	neighborhood_id = neighborhood_row[0]
 	neighborhood_display_name = neighborhood_row[1]
 	
+	# Build query parameters based on filters
+	query_params = {"neighborhood_id": neighborhood_id}
+	complaint_type_filter = ""
+	
+	if filter_complaint_type:
+		complaint_type_filter = "AND c.complaint_type_id = :complaint_type_id"
+		query_params["complaint_type_id"] = filter_complaint_type
+	
 	# Get statistics: average completion speed
-	avg_speed_query = """
+	avg_speed_query = f"""
 		SELECT 
 			AVG(EXTRACT(EPOCH FROM (c.closed_at - c.created_at)) / 86400) as avg_days
 		FROM complaint c
 		JOIN address a ON c.address_id = a.address_id
 		WHERE a.neighborhood_id = :neighborhood_id
+		  {complaint_type_filter}
 		  AND c.closed_at IS NOT NULL
 		  AND c.created_at IS NOT NULL
 	"""
-	cursor = g.conn.execute(text(avg_speed_query), {"neighborhood_id": neighborhood_id})
+	cursor = g.conn.execute(text(avg_speed_query), query_params)
 	avg_speed_row = cursor.fetchone()
 	cursor.close()
 	avg_speed = round(avg_speed_row[0], 2) if avg_speed_row[0] else 0
 	
 	# Get complaint counts by type
-	complaint_type_query = """
+	complaint_type_query = f"""
 		SELECT 
 			ct.complaint_topic,
 			COUNT(*) as count
@@ -243,10 +338,11 @@ def neighborhood_search():
 		JOIN address a ON c.address_id = a.address_id
 		JOIN complaint_type ct ON c.complaint_type_id = ct.complaint_type_id
 		WHERE a.neighborhood_id = :neighborhood_id
+		  {complaint_type_filter}
 		GROUP BY ct.complaint_topic
 		ORDER BY count DESC
 	"""
-	cursor = g.conn.execute(text(complaint_type_query), {"neighborhood_id": neighborhood_id})
+	cursor = g.conn.execute(text(complaint_type_query), query_params)
 	complaint_types = []
 	total_complaints = 0
 	for row in cursor:
@@ -255,9 +351,13 @@ def neighborhood_search():
 	cursor.close()
 	
 	context = {
+		"neighborhoods": neighborhoods,
+		"complaint_types": complaint_types_list,
+		"selected_neighborhood_id": neighborhood_id,
+		"selected_complaint_type_id": filter_complaint_type,
 		"neighborhood_name": neighborhood_display_name,
 		"avg_speed": avg_speed,
-		"complaint_types": complaint_types,
+		"complaint_type_breakdown": complaint_types,
 		"total_complaints": total_complaints
 	}
 	
@@ -268,9 +368,43 @@ def neighborhood_search():
 @app.route('/agency')
 def agency_view():
 	"""
-	Display form to search agencies
+	Display form to search agencies with dynamic dropdowns
 	"""
-	return render_template("agency.html")
+	# Get all agencies from database
+	agencies = []
+	complaint_types = []
+	
+	try:
+		agencies_query = """
+			SELECT agency_id, agency_name 
+			FROM agency 
+			ORDER BY agency_name
+		"""
+		cursor = g.conn.execute(text(agencies_query))
+		for row in cursor:
+			agencies.append({"id": row[0], "name": row[1]})
+		cursor.close()
+		
+		# Get all complaint types from database
+		complaint_types_query = """
+			SELECT complaint_type_id, complaint_topic 
+			FROM complaint_type 
+			ORDER BY complaint_topic
+		"""
+		cursor = g.conn.execute(text(complaint_types_query))
+		for row in cursor:
+			complaint_types.append({"id": row[0], "topic": row[1]})
+		cursor.close()
+	except Exception as e:
+		print(f"Error loading agency dropdowns: {e}")
+		import traceback
+		traceback.print_exc()
+	
+	print(f"Loaded {len(agencies)} agencies and {len(complaint_types)} complaint types")
+	
+	return render_template("agency.html", 
+		agencies=agencies, 
+		complaint_types=complaint_types)
 
 
 @app.route('/agency/search', methods=['GET'])
@@ -281,54 +415,117 @@ def agency_search():
 	- City-wide benchmark for comparison
 	- Total complaints handled
 	"""
+	# Get agencies and complaint types for dropdowns
+	agencies = []
+	complaint_types = []
+	
+	try:
+		agencies_query = """
+			SELECT agency_id, agency_name 
+			FROM agency 
+			ORDER BY agency_name
+		"""
+		cursor = g.conn.execute(text(agencies_query))
+		for row in cursor:
+			agencies.append({"id": row[0], "name": row[1]})
+		cursor.close()
+		
+		complaint_types_query = """
+			SELECT complaint_type_id, complaint_topic 
+			FROM complaint_type 
+			ORDER BY complaint_topic
+		"""
+		cursor = g.conn.execute(text(complaint_types_query))
+		for row in cursor:
+			complaint_types.append({"id": row[0], "topic": row[1]})
+		cursor.close()
+	except Exception as e:
+		print(f"Error loading agency dropdown data in search: {e}")
+		import traceback
+		traceback.print_exc()
+	
+	# Get search parameters
+	agency_id = request.args.get('agency_id', '').strip()
 	agency_name = request.args.get('agency_name', '').strip()
+	filter_complaint_type = request.args.get('complaint_type_id', '').strip()
 	
-	if not agency_name:
-		return render_template("agency.html", error="Please enter an agency name")
-	
-	# Get agency_id (case-insensitive partial match)
-	agency_query = """
-		SELECT agency_id, agency_name 
-		FROM agency 
-		WHERE UPPER(agency_name) LIKE UPPER(:name)
-		LIMIT 1
-	"""
-	cursor = g.conn.execute(text(agency_query), {"name": f"%{agency_name}%"})
-	agency_row = cursor.fetchone()
-	cursor.close()
+	# Determine which parameter to use (dropdown takes precedence)
+	if agency_id:
+		# Using dropdown selection
+		agency_query = """
+			SELECT agency_id, agency_name 
+			FROM agency 
+			WHERE agency_id = :id
+		"""
+		cursor = g.conn.execute(text(agency_query), {"id": agency_id})
+		agency_row = cursor.fetchone()
+		cursor.close()
+	elif agency_name:
+		# Using text search (case-insensitive partial match)
+		agency_query = """
+			SELECT agency_id, agency_name 
+			FROM agency 
+			WHERE UPPER(agency_name) LIKE UPPER(:name)
+			LIMIT 1
+		"""
+		cursor = g.conn.execute(text(agency_query), {"name": f"%{agency_name}%"})
+		agency_row = cursor.fetchone()
+		cursor.close()
+	else:
+		return render_template("agency.html", 
+			agencies=agencies,
+			complaint_types=complaint_types,
+			error="Please select or enter an agency name")
 	
 	if not agency_row:
-		return render_template("agency.html", error=f"Agency matching '{agency_name}' not found")
+		return render_template("agency.html", 
+			agencies=agencies,
+			complaint_types=complaint_types,
+			error=f"Agency not found")
 	
 	agency_id = agency_row[0]
 	agency_display_name = agency_row[1]
 	
+	# Build query parameters based on filters
+	query_params = {"agency_id": agency_id}
+	complaint_type_filter = ""
+	
+	if filter_complaint_type:
+		complaint_type_filter = "AND c.complaint_type_id = :complaint_type_id"
+		query_params["complaint_type_id"] = filter_complaint_type
+	
 	# Get agency's average completion speed
-	agency_speed_query = """
+	agency_speed_query = f"""
 		SELECT 
 			AVG(EXTRACT(EPOCH FROM (c.closed_at - c.created_at)) / 86400) as avg_days,
 			COUNT(*) as total_complaints
 		FROM complaint c
 		WHERE c.agency_id = :agency_id
+		  {complaint_type_filter}
 		  AND c.closed_at IS NOT NULL
 		  AND c.created_at IS NOT NULL
 	"""
-	cursor = g.conn.execute(text(agency_speed_query), {"agency_id": agency_id})
+	cursor = g.conn.execute(text(agency_speed_query), query_params)
 	agency_row = cursor.fetchone()
 	cursor.close()
 	
 	agency_avg_speed = round(agency_row[0], 2) if agency_row[0] else 0
 	agency_total_complaints = agency_row[1] if agency_row[1] else 0
 	
-	# Get city-wide benchmark (average across all agencies)
-	citywide_query = """
+	# Get city-wide benchmark (average across all agencies) with same filter
+	citywide_query_params = {}
+	if filter_complaint_type:
+		citywide_query_params["complaint_type_id"] = filter_complaint_type
+	
+	citywide_query = f"""
 		SELECT 
 			AVG(EXTRACT(EPOCH FROM (c.closed_at - c.created_at)) / 86400) as avg_days
 		FROM complaint c
 		WHERE c.closed_at IS NOT NULL
 		  AND c.created_at IS NOT NULL
+		  {complaint_type_filter.replace(':agency_id', ':complaint_type_id') if filter_complaint_type else ''}
 	"""
-	cursor = g.conn.execute(text(citywide_query))
+	cursor = g.conn.execute(text(citywide_query), citywide_query_params)
 	citywide_row = cursor.fetchone()
 	cursor.close()
 	
@@ -346,12 +543,36 @@ def agency_search():
 	else:
 		performance_text = "N/A"
 	
+	# Get complaint breakdown by type for this agency
+	complaint_breakdown_query = f"""
+		SELECT 
+			ct.complaint_topic,
+			COUNT(*) as count
+		FROM complaint c
+		JOIN complaint_type ct ON c.complaint_type_id = ct.complaint_type_id
+		WHERE c.agency_id = :agency_id
+		  {complaint_type_filter}
+		GROUP BY ct.complaint_topic
+		ORDER BY count DESC
+		LIMIT 10
+	"""
+	cursor = g.conn.execute(text(complaint_breakdown_query), query_params)
+	complaint_breakdown = []
+	for row in cursor:
+		complaint_breakdown.append({"type": row[0], "count": row[1]})
+	cursor.close()
+	
 	context = {
+		"agencies": agencies,
+		"complaint_types": complaint_types,
+		"selected_agency_id": agency_id,
+		"selected_complaint_type_id": filter_complaint_type,
 		"agency_name": agency_display_name,
 		"agency_avg_speed": agency_avg_speed,
 		"citywide_avg_speed": citywide_avg_speed,
 		"performance_text": performance_text,
-		"total_complaints": agency_total_complaints
+		"total_complaints": agency_total_complaints,
+		"complaint_breakdown": complaint_breakdown
 	}
 	
 	return render_template("agency.html", **context)
@@ -537,64 +758,6 @@ def untrack_complaint(user_id, complaint_id):
 	g.conn.commit()
 	
 	return redirect(f'/user/{user_id}')
-
-# ==================== ADDRESS VIEW ====================
-@app.route('/address')
-def address_list():
-	"""
-	Display list of known addresses by neighborhood
-	"""
-	address_query = """
-		SELECT 
-			a.address_id,
-			a.street1,
-			a.street2,
-			a.postal_code,
-			n.name as neighborhood_name
-		FROM address a
-		JOIN neighborhood n ON a.neighborhood_id = n.neighborhood_id
-		ORDER BY n.name, a.street1, a.street2
-	"""
-	cursor = g.conn.execute(text(address_query))
-	addresses = []
-	for row in cursor:
-		addresses.append({
-			"address_id": row[0],
-			"street1": row[1],
-			"street2": row[2],
-			"postal_code": row[3],
-			"neighborhood_name": row[4]
-		})
-	cursor.close()
-	
-	return render_template("address.html", addresses=addresses)
-
-
-# ==================== DEFAULT HANDLERS VIEW ====================
-@app.route('/default-handlers')
-def default_handlers_view():
-	"""
-	Display which agency handles each complaint type by default
-	"""
-	handler_query = """
-		SELECT 
-			ct.complaint_topic,
-			a.agency_name
-		FROM handle_by_default h
-		JOIN complaint_type ct ON h.complaint_type_id = ct.complaint_type_id
-		JOIN agency a ON h.agency_id = a.agency_id
-		ORDER BY ct.complaint_topic
-	"""
-	cursor = g.conn.execute(text(handler_query))
-	mappings = []
-	for row in cursor:
-		mappings.append({
-			"complaint_topic": row[0],
-			"agency_name": row[1]
-		})
-	cursor.close()
-	
-	return render_template("default_handlers.html", mappings=mappings)
 
 
 if __name__ == "__main__":
