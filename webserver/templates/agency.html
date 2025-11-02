@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agency Performance</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .search-form {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .stat-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #28a745;
+        }
+        .stat-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            color: #333;
+            margin: 5px 0;
+        }
+        .comparison {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border-left: 4px solid #0066cc;
+        }
+        .comparison h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .benchmark {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .benchmark-item {
+            text-align: center;
+            padding: 15px;
+        }
+        .nav-links {
+            margin: 20px 0;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Agency Performance</h1>
+        
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/neighborhood">Neighborhood View</a>
+            <a href="/user">User Profiles</a>
+        </div>
+
+        <div class="search-form">
+            <form method="GET" action="/agency/search">
+                <input type="text" name="agency_name" placeholder="Enter agency name (e.g., Police)" required>
+                <button type="submit">Search</button>
+            </form>
+            <p style="color: #666; font-size: 0.9em;">Tip: You can enter a partial name (e.g., "Police" will find "New York City Police Department")</p>
+        </div>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if agency_name %}
+            <div class="results">
+                <h2>{{ agency_name }}</h2>
+                
+                <div class="stat-box">
+                    <div class="stat-label">Total Complaints Handled</div>
+                    <div class="stat-value">{{ total_complaints }}</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-label">Average Completion Time</div>
+                    <div class="stat-value">{{ agency_avg_speed }} days</div>
+                </div>
+
+                <div class="comparison">
+                    <h3>Performance Comparison</h3>
+                    <div class="benchmark">
+                        <div class="benchmark-item">
+                            <div class="stat-label">This Agency</div>
+                            <div class="stat-value">{{ agency_avg_speed }} days</div>
+                        </div>
+                        <div class="benchmark-item">
+                            <div class="stat-label">City-Wide Average</div>
+                            <div class="stat-value">{{ citywide_avg_speed }} days</div>
+                        </div>
+                    </div>
+                    <p style="text-align: center; font-weight: bold; color: #0066cc;">
+                        {{ performance_text }}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

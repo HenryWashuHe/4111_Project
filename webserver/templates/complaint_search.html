@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Complaints</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .search-form {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #6f42c1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #5a32a3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #6f42c1;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .track-form {
+            display: inline;
+        }
+        .track-form input[type="text"] {
+            width: 150px;
+            padding: 5px;
+            margin-right: 5px;
+        }
+        .track-form button {
+            padding: 5px 10px;
+            font-size: 0.9em;
+            background-color: #28a745;
+        }
+        .track-form button:hover {
+            background-color: #218838;
+        }
+        .nav-links {
+            margin: 20px 0;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        .user-select {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #fff3cd;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+        .user-select label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .user-select select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+    <script>
+        function setUser(userId) {
+            localStorage.setItem('selectedUserId', userId);
+        }
+        
+        function getSelectedUser() {
+            return localStorage.getItem('selectedUserId');
+        }
+        
+        function trackComplaint(complaintId) {
+            const userId = getSelectedUser();
+            if (!userId) {
+                alert('Please select a user first');
+                return false;
+            }
+            const note = prompt('Add a note (optional):');
+            if (note === null) return false; // User cancelled
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/user/${userId}/track/${complaintId}`;
+            
+            const noteInput = document.createElement('input');
+            noteInput.type = 'hidden';
+            noteInput.name = 'note';
+            noteInput.value = note || '';
+            form.appendChild(noteInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+            return false;
+        }
+        
+        window.onload = function() {
+            const userId = getSelectedUser();
+            if (userId) {
+                const select = document.getElementById('userSelect');
+                if (select) {
+                    select.value = userId;
+                }
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Search Complaints to Track</h1>
+        
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/user">User Profiles</a>
+            <a href="/neighborhood">Neighborhood View</a>
+            <a href="/agency">Agency View</a>
+        </div>
+
+        <div class="user-select">
+            <label for="userSelect">Select User to Track For:</label>
+            <select id="userSelect" onchange="setUser(this.value)">
+                <option value="">-- Select a User --</option>
+                <!-- This should be populated with users from database -->
+                <option value="US0000000001">Ava Chen</option>
+                <option value="US0000000002">Liam Patel</option>
+                <option value="US0000000003">Noah Garcia</option>
+                <option value="US0000000004">Emma Rossi</option>
+                <option value="US0000000005">Olivia Kim</option>
+                <option value="US0000000006">Mason Clark</option>
+                <option value="US0000000007">Sophia Rivera</option>
+                <option value="US0000000008">Ethan Nguyen</option>
+                <option value="US0000000009">Mia Thompson</option>
+                <option value="US0000000010">Isabella Lopez</option>
+            </select>
+        </div>
+
+        <div class="search-form">
+            <form method="GET" action="/complaint/search">
+                <input type="text" name="query" placeholder="Search by description or complaint type..." value="{{ query if query else '' }}" required>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        {% if query %}
+            {% if complaints %}
+                <p>Found {{ complaints|length }} complaints matching "{{ query }}"</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Complaint ID</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Agency</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for complaint in complaints %}
+                        <tr>
+                            <td>{{ complaint.complaint_id }}</td>
+                            <td>{{ complaint.complaint_topic }}</td>
+                            <td>{{ complaint.description[:60] }}...</td>
+                            <td>{{ complaint.agency_name }}</td>
+                            <td>{{ complaint.status_name }}</td>
+                            <td>{{ complaint.created_at.strftime('%Y-%m-%d') if complaint.created_at else 'N/A' }}</td>
+                            <td>
+                                <button onclick="trackComplaint('{{ complaint.complaint_id }}')">Track</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    <p>No complaints found matching "{{ query }}"</p>
+                    <p>Try a different search term</p>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</body>
+</html>

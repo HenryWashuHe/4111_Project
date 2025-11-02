@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Neighborhood Statistics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .search-form {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .stat-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .stat-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            color: #333;
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .nav-links {
+            margin: 20px 0;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Neighborhood Statistics</h1>
+        
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/agency">Agency View</a>
+            <a href="/user">User Profiles</a>
+        </div>
+
+        <div class="search-form">
+            <form method="GET" action="/neighborhood/search">
+                <input type="text" name="neighborhood_name" placeholder="Enter neighborhood name (e.g., NEW YORK)" required>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if neighborhood_name %}
+            <div class="results">
+                <h2>Statistics for {{ neighborhood_name }}</h2>
+                
+                <div class="stat-box">
+                    <div class="stat-label">Total Complaints</div>
+                    <div class="stat-value">{{ total_complaints }}</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-label">Average Completion Time</div>
+                    <div class="stat-value">{{ avg_speed }} days</div>
+                </div>
+
+                <h3>Complaints by Type</h3>
+                {% if complaint_types %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Complaint Type</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ct in complaint_types %}
+                            <tr>
+                                <td>{{ ct.type }}</td>
+                                <td>{{ ct.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>No complaints found for this neighborhood.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

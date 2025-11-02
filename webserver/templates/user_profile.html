@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ user.name }} - Profile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .user-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border-left: 4px solid #6f42c1;
+        }
+        .user-info p {
+            margin: 10px 0;
+        }
+        .user-info strong {
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #6f42c1;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .action-btn {
+            padding: 5px 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .action-btn:hover {
+            background-color: #c82333;
+        }
+        .nav-links {
+            margin: 20px 0;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        .search-link {
+            display: inline-block;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background-color: #6f42c1;
+            color: white;
+            border-radius: 4px;
+            text-decoration: none;
+        }
+        .search-link:hover {
+            background-color: #5a32a3;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/user">All Users</a>
+            <a href="/neighborhood">Neighborhood View</a>
+            <a href="/agency">Agency View</a>
+        </div>
+
+        <h1>User Profile: {{ user.name }}</h1>
+        
+        <div class="user-info">
+            <p><strong>User ID:</strong> {{ user.user_id }}</p>
+            <p><strong>Email:</strong> {{ user.email_address }}</p>
+            <p><strong>Member Since:</strong> {{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</p>
+        </div>
+
+        <h2>Tracked Complaints</h2>
+        
+        <a href="/complaint/search" class="search-link">➕ Track New Complaint</a>
+
+        {% if tracked_complaints %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Complaint ID</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Agency</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Note</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for complaint in tracked_complaints %}
+                    <tr>
+                        <td>{{ complaint.complaint_id }}</td>
+                        <td>{{ complaint.complaint_topic }}</td>
+                        <td>{{ complaint.description[:50] }}...</td>
+                        <td>{{ complaint.agency_name }}</td>
+                        <td>{{ complaint.status_name }}</td>
+                        <td>{{ complaint.created_at.strftime('%Y-%m-%d') if complaint.created_at else 'N/A' }}</td>
+                        <td>{{ complaint.note if complaint.note else '-' }}</td>
+                        <td>
+                            <form method="POST" action="/user/{{ user.user_id }}/untrack/{{ complaint.complaint_id }}" style="display: inline;">
+                                <button type="submit" class="action-btn" onclick="return confirm('Remove this complaint from tracking?')">Untrack</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty-state">
+                <p>No tracked complaints yet.</p>
+                <p>Use the search above to find and track complaints.</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
