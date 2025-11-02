@@ -538,6 +538,64 @@ def untrack_complaint(user_id, complaint_id):
 	
 	return redirect(f'/user/{user_id}')
 
+# ==================== ADDRESS VIEW ====================
+@app.route('/address')
+def address_list():
+	"""
+	Display list of known addresses by neighborhood
+	"""
+	address_query = """
+		SELECT 
+			a.address_id,
+			a.street1,
+			a.street2,
+			a.postal_code,
+			n.name as neighborhood_name
+		FROM address a
+		JOIN neighborhood n ON a.neighborhood_id = n.neighborhood_id
+		ORDER BY n.name, a.street1, a.street2
+	"""
+	cursor = g.conn.execute(text(address_query))
+	addresses = []
+	for row in cursor:
+		addresses.append({
+			"address_id": row[0],
+			"street1": row[1],
+			"street2": row[2],
+			"postal_code": row[3],
+			"neighborhood_name": row[4]
+		})
+	cursor.close()
+	
+	return render_template("address.html", addresses=addresses)
+
+
+# ==================== DEFAULT HANDLERS VIEW ====================
+@app.route('/default-handlers')
+def default_handlers_view():
+	"""
+	Display which agency handles each complaint type by default
+	"""
+	handler_query = """
+		SELECT 
+			ct.complaint_topic,
+			a.agency_name
+		FROM handle_by_default h
+		JOIN complaint_type ct ON h.complaint_type_id = ct.complaint_type_id
+		JOIN agency a ON h.agency_id = a.agency_id
+		ORDER BY ct.complaint_topic
+	"""
+	cursor = g.conn.execute(text(handler_query))
+	mappings = []
+	for row in cursor:
+		mappings.append({
+			"complaint_topic": row[0],
+			"agency_name": row[1]
+		})
+	cursor.close()
+	
+	return render_template("default_handlers.html", mappings=mappings)
+
 
 if __name__ == "__main__":
 	import click
