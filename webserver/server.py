@@ -184,6 +184,65 @@ def login():
 	this_is_never_executed()
 
 
+# ==================== ADDRESS VIEW ====================
+@app.route('/address')
+def address_view():
+	"""
+	Display all addresses with their neighborhoods
+	"""
+	addresses_query = """
+		SELECT 
+			a.address_id,
+			a.street1,
+			a.street2,
+			a.postal_code,
+			n.name as neighborhood_name
+		FROM address a
+		LEFT JOIN neighborhood n ON a.neighborhood_id = n.neighborhood_id
+		ORDER BY n.name, a.street1
+	"""
+	cursor = g.conn.execute(text(addresses_query))
+	addresses = []
+	for row in cursor:
+		addresses.append({
+			"address_id": row[0],
+			"street1": row[1],
+			"street2": row[2],
+			"postal_code": row[3],
+			"neighborhood_name": row[4]
+		})
+	cursor.close()
+	
+	return render_template("address.html", addresses=addresses)
+
+
+# ==================== DEFAULT HANDLERS VIEW ====================
+@app.route('/default-handlers')
+def default_handlers_view():
+	"""
+	Display the default agency mappings for complaint types
+	"""
+	mappings_query = """
+		SELECT 
+			ct.complaint_topic,
+			a.agency_name
+		FROM handle_by_default hbd
+		JOIN complaint_type ct ON hbd.complaint_type_id = ct.complaint_type_id
+		JOIN agency a ON hbd.agency_id = a.agency_id
+		ORDER BY ct.complaint_topic
+	"""
+	cursor = g.conn.execute(text(mappings_query))
+	mappings = []
+	for row in cursor:
+		mappings.append({
+			"complaint_topic": row[0],
+			"agency_name": row[1]
+		})
+	cursor.close()
+	
+	return render_template("default_handlers.html", mappings=mappings)
+
+
 # ==================== NEIGHBORHOOD VIEW ====================
 @app.route('/neighborhood')
 def neighborhood_view():
