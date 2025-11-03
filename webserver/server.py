@@ -184,71 +184,16 @@ def login():
 	this_is_never_executed()
 
 
-# ==================== ADDRESS VIEW ====================
-@app.route('/address')
-def address_view():
-	"""
-	Display all addresses with their neighborhoods
-	"""
-	addresses_query = """
-		SELECT 
-			a.address_id,
-			a.street1,
-			a.street2,
-			a.postal_code,
-			n.name as neighborhood_name
-		FROM address a
-		LEFT JOIN neighborhood n ON a.neighborhood_id = n.neighborhood_id
-		ORDER BY n.name, a.street1
-	"""
-	cursor = g.conn.execute(text(addresses_query))
-	addresses = []
-	for row in cursor:
-		addresses.append({
-			"address_id": row[0],
-			"street1": row[1],
-			"street2": row[2],
-			"postal_code": row[3],
-			"neighborhood_name": row[4]
-		})
-	cursor.close()
-	
-	return render_template("address.html", addresses=addresses)
-
-
-# ==================== DEFAULT HANDLERS VIEW ====================
-@app.route('/default-handlers')
-def default_handlers_view():
-	"""
-	Display the default agency mappings for complaint types
-	"""
-	mappings_query = """
-		SELECT 
-			ct.complaint_topic,
-			a.agency_name
-		FROM handle_by_default hbd
-		JOIN complaint_type ct ON hbd.complaint_type_id = ct.complaint_type_id
-		JOIN agency a ON hbd.agency_id = a.agency_id
-		ORDER BY ct.complaint_topic
-	"""
-	cursor = g.conn.execute(text(mappings_query))
-	mappings = []
-	for row in cursor:
-		mappings.append({
-			"complaint_topic": row[0],
-			"agency_name": row[1]
-		})
-	cursor.close()
-	
-	return render_template("default_handlers.html", mappings=mappings)
-
-
 # ==================== NEIGHBORHOOD VIEW ====================
 @app.route('/neighborhood')
 def neighborhood_view():
 	"""
 	Display form to search neighborhoods with dynamic dropdowns
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	# Get all neighborhoods from database
 	neighborhoods = []
 	complaint_types = []
@@ -294,6 +239,10 @@ def neighborhood_search():
 	- Complaint counts by type
 	- Total complaints
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	# Get neighborhoods and complaint types for dropdowns
 	neighborhoods = []
 	complaint_types_list = []
@@ -429,6 +378,10 @@ def agency_view():
 	"""
 	Display form to search agencies with dynamic dropdowns
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	# Get all agencies from database
 	agencies = []
 	complaint_types = []
@@ -474,6 +427,10 @@ def agency_search():
 	- City-wide benchmark for comparison
 	- Total complaints handled
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	# Get agencies and complaint types for dropdowns
 	agencies = []
 	complaint_types = []
@@ -561,6 +518,8 @@ def agency_search():
 		FROM complaint c
 		WHERE c.agency_id = :agency_id
 		  {complaint_type_filter}
+		  AND c.closed_at IS NOT NULL
+		  AND c.created_at IS NOT NULL
 	"""
 	cursor = g.conn.execute(text(agency_speed_query), query_params)
 	agency_row = cursor.fetchone()
@@ -641,6 +600,10 @@ def user_list():
 	"""
 	Display list of all users
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	users_query = """
 		SELECT user_id, name, email_address, created_at
 		FROM app_user
@@ -657,7 +620,78 @@ def user_list():
 		})
 	cursor.close()
 	
-	return render_template("user_list.html", users=users)
+	# Get message from query params (after redirect)
+	message = request.args.get('message')
+	success = request.args.get('success') == 'true'
+	
+	return render_template("user_list.html", users=users, message=message, success=success)
+
+
+@app.route('/user/create', methods=['POST'])
+def create_user():
+	"""
+	Create a new user
+	"""
+	# Check database connection
+	if g.conn is None:
+		return redirect('/user?message=Database connection error&success=false')
+	
+	try:
+		name = request.form.get('name', '').strip()
+		email_address = request.form.get('email_address', '').strip()
+		
+		# Validate input
+		if not name or not email_address:
+			return redirect('/user?message=Name and email are required&success=false')
+		
+		# Check if email already exists
+		check_query = """
+			SELECT user_id FROM app_user WHERE email_address = :email
+		"""
+		cursor = g.conn.execute(text(check_query), {"email": email_address})
+		existing = cursor.fetchone()
+		cursor.close()
+		
+		if existing:
+			return redirect('/user?message=Email address already exists&success=false')
+		
+		# Generate new user_id (format: US + 10 digits)
+		# Get the highest existing user_id number
+		id_query = """
+			SELECT user_id FROM app_user ORDER BY user_id DESC LIMIT 1
+		"""
+		cursor = g.conn.execute(text(id_query))
+		last_id = cursor.fetchone()
+		cursor.close()
+		
+		if last_id:
+			# Extract number from last_id (e.g., "US0000000001" -> 1)
+			last_num = int(last_id[0][2:])
+			new_num = last_num + 1
+		else:
+			new_num = 1
+		
+		new_user_id = f"US{new_num:010d}"
+		
+		# Insert new user
+		insert_query = """
+			INSERT INTO app_user (user_id, name, email_address, created_at)
+			VALUES (:user_id, :name, :email, CURRENT_TIMESTAMP)
+		"""
+		g.conn.execute(text(insert_query), {
+			"user_id": new_user_id,
+			"name": name,
+			"email": email_address
+		})
+		g.conn.commit()
+		
+		return redirect(f'/user?message=User {name} created successfully!&success=true')
+		
+	except Exception as e:
+		print(f"Error creating user: {e}")
+		import traceback
+		traceback.print_exc()
+		return redirect('/user?message=Error creating user. Please try again.&success=false')
 
 
 @app.route('/user/<user_id>')
@@ -665,6 +699,10 @@ def user_profile(user_id):
 	"""
 	Display user profile with tracked complaints
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	# Get user info
 	user_query = """
 		SELECT user_id, name, email_address, created_at
@@ -729,10 +767,29 @@ def complaint_search():
 	"""
 	Search for complaints to track
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
+	# Get all users for the dropdown
+	users_query = """
+		SELECT user_id, name
+		FROM app_user
+		ORDER BY name
+	"""
+	cursor = g.conn.execute(text(users_query))
+	users = []
+	for row in cursor:
+		users.append({
+			"user_id": row[0],
+			"name": row[1]
+		})
+	cursor.close()
+	
 	query = request.args.get('query', '').strip()
 	
 	if not query:
-		return render_template("complaint_search.html", complaints=[])
+		return render_template("complaint_search.html", complaints=[], users=users)
 	
 	# Search complaints by description or complaint type
 	search_query = """
@@ -765,7 +822,7 @@ def complaint_search():
 		})
 	cursor.close()
 	
-	return render_template("complaint_search.html", complaints=complaints, query=query)
+	return render_template("complaint_search.html", complaints=complaints, query=query, users=users)
 
 
 @app.route('/user/<user_id>/track/<complaint_id>', methods=['POST'])
@@ -773,6 +830,10 @@ def track_complaint(user_id, complaint_id):
 	"""
 	Add a complaint to user's tracked list
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	note = request.form.get('note', '').strip()
 	
 	# Check if already tracking
@@ -807,6 +868,10 @@ def untrack_complaint(user_id, complaint_id):
 	"""
 	Remove a complaint from user's tracked list
 	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
 	delete_query = """
 		DELETE FROM tracked_by 
 		WHERE user_id = :user_id AND complaint_id = :complaint_id
