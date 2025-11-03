@@ -256,7 +256,9 @@ def default_handlers_view():
 			})
 		cursor.close()
 		
-		return render_template("default_handlers.html", handlers=handlers)
+		print(f"Loaded {len(handlers)} default handler mappings")
+		
+		return render_template("default_handlers.html", mappings=handlers)
 		
 	except Exception as e:
 		print(f"Error loading default handlers: {e}")
