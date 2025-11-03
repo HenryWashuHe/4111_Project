@@ -777,6 +777,51 @@ def create_user():
 		return redirect('/user?message=Error creating user. Please try again.&success=false')
 
 
+@app.route('/user/<user_id>/delete', methods=['POST'])
+def delete_user(user_id):
+	"""
+	Delete a user and all their tracked complaints
+	"""
+	# Check database connection
+	if g.conn is None:
+		return redirect('/user?message=Database connection error&success=false')
+	
+	try:
+		# First, get the user's name for the confirmation message
+		user_query = """
+			SELECT name FROM app_user WHERE user_id = :user_id
+		"""
+		cursor = g.conn.execute(text(user_query), {"user_id": user_id})
+		user_row = cursor.fetchone()
+		cursor.close()
+		
+		if not user_row:
+			return redirect('/user?message=User not found&success=false')
+		
+		user_name = user_row[0]
+		
+		# Delete all tracked complaints for this user (foreign key constraint)
+		delete_tracked_query = """
+			DELETE FROM tracked_by WHERE user_id = :user_id
+		"""
+		g.conn.execute(text(delete_tracked_query), {"user_id": user_id})
+		
+		# Delete the user
+		delete_user_query = """
+			DELETE FROM app_user WHERE user_id = :user_id
+		"""
+		g.conn.execute(text(delete_user_query), {"user_id": user_id})
+		g.conn.commit()
+		
+		return redirect(f'/user?message=User {user_name} deleted successfully&success=true')
+		
+	except Exception as e:
+		print(f"Error deleting user: {e}")
+		import traceback
+		traceback.print_exc()
+		return redirect('/user?message=Error deleting user. Please try again.&success=false')
+
+
 @app.route('/user/<user_id>')
 def user_profile(user_id):
 	"""
