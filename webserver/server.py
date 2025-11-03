@@ -184,6 +184,87 @@ def login():
 	this_is_never_executed()
 
 
+# ==================== ADDRESS VIEW ====================
+@app.route('/address')
+def address_view():
+	"""
+	Display all addresses with their neighborhoods
+	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
+	try:
+		addresses_query = """
+			SELECT 
+				a.address_id,
+				a.street1,
+				a.street2,
+				a.postal_code,
+				n.name as neighborhood_name
+			FROM address a
+			LEFT JOIN neighborhood n ON a.neighborhood_id = n.neighborhood_id
+			ORDER BY n.name, a.street1
+		"""
+		cursor = g.conn.execute(text(addresses_query))
+		addresses = []
+		for row in cursor:
+			addresses.append({
+				"address_id": row[0],
+				"street1": row[1],
+				"street2": row[2],
+				"postal_code": row[3],
+				"neighborhood_name": row[4]
+			})
+		cursor.close()
+		
+		return render_template("address.html", addresses=addresses)
+		
+	except Exception as e:
+		print(f"Error loading addresses: {e}")
+		import traceback
+		traceback.print_exc()
+		return "Error loading addresses. Please try again.", 500
+
+
+# ==================== DEFAULT HANDLERS VIEW ====================
+@app.route('/default-handlers')
+def default_handlers_view():
+	"""
+	Display complaint types and their default handling agencies
+	"""
+	# Check database connection
+	if g.conn is None:
+		return "Database connection error. Please check your credentials and try again.", 500
+	
+	try:
+		handlers_query = """
+			SELECT 
+				ct.complaint_topic,
+				a.agency_name
+			FROM handle_by_default hbd
+			JOIN complaint_type ct ON hbd.complaint_type_id = ct.complaint_type_id
+			JOIN agency a ON hbd.agency_id = a.agency_id
+			ORDER BY ct.complaint_topic, a.agency_name
+		"""
+		cursor = g.conn.execute(text(handlers_query))
+		handlers = []
+		for row in cursor:
+			handlers.append({
+				"complaint_topic": row[0],
+				"agency_name": row[1]
+			})
+		cursor.close()
+		
+		return render_template("default_handlers.html", handlers=handlers)
+		
+	except Exception as e:
+		print(f"Error loading default handlers: {e}")
+		import traceback
+		traceback.print_exc()
+		return "Error loading default handlers. Please try again.", 500
+
+
 # ==================== NEIGHBORHOOD VIEW ====================
 @app.route('/neighborhood')
 def neighborhood_view():
