@@ -561,8 +561,6 @@ def agency_search():
 		FROM complaint c
 		WHERE c.agency_id = :agency_id
 		  {complaint_type_filter}
-		  AND c.closed_at IS NOT NULL
-		  AND c.created_at IS NOT NULL
 	"""
 	cursor = g.conn.execute(text(agency_speed_query), query_params)
 	agency_row = cursor.fetchone()
